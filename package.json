@@ -1,0 +1,16 @@
+{
+  "name": "pledgedrive",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "npm run build && node dist/services/api/src/server.js",
+    "build": "tsc -p tsconfig.json && node scripts/copy-web.mjs",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "lint": "node --check apps/web/public/app.js",
+    "test": "npm run build && node --test dist/tests/**/*.test.js",
+    "node": "npm run build && node dist/node/core/src/cli.js",
+    "demo": "npm run build && node dist/tests/distributed.integration.test.js"
+  },
+  "devDependencies": { "@types/node": "^22.10.2", "typescript": "^5.7.2" }
+}

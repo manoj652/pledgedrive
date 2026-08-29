@@ -1,0 +1,8 @@
+{
+  "compilerOptions": {
+    "target": "ES2022", "module": "NodeNext", "moduleResolution": "NodeNext",
+    "outDir": "dist", "rootDir": ".", "strict": true, "esModuleInterop": true,
+    "forceConsistentCasingInFileNames": true, "skipLibCheck": true
+  },
+  "include": ["services/**/*.ts", "packages/**/*.ts", "node/**/*.ts", "tests/**/*.ts"]
+}
