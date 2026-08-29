@@ -9,6 +9,8 @@ PledgeDrive is a production-grade core MVP for encrypted, replicated cloud stora
 ## What works today
 
 - 5 GB account quota, file listing/search, upload, download, and delete.
+- Account registration, sign-in/sign-out, salted scrypt password hashes, and revocable HttpOnly session cookies.
+- File classification for photos, videos, audio, documents, archives, and text; safe inline preview for common image/video/audio formats and PDFs.
 - 4 MiB chunking with three replicas across independent users where capacity allows.
 - AES-256-GCM envelope encryption at rest: a per-file key is wrapped by the configured 32-byte master key; nodes only hold ciphertext.
 - SHA-256 verification of both ciphertext and recovered plaintext, with automatic download failover to another healthy replica.
@@ -47,7 +49,7 @@ PLEDGEDRIVE_API_TOKEN=<at least 32 random characters>
 PLEDGEDRIVE_STATE_FILE=/var/lib/pledgedrive/state.json
 ```
 
-Production startup fails closed if the master key or API token is missing. When `PLEDGEDRIVE_API_TOKEN` is set, API calls must send `Authorization: Bearer <token>`; health, readiness, metrics, OpenAPI, and static assets remain probeable. The current token maps to the configured `PLEDGEDRIVE_USER_ID`; replace that single-account adapter with your identity provider before exposing the service to multiple users.
+Production startup fails closed if the master key or API token is missing. When `PLEDGEDRIVE_API_TOKEN` is set, service-to-service API calls use `Authorization: Bearer <token>`; browser accounts use the revocable HttpOnly session cookie. Health, readiness, metrics, OpenAPI, and static assets remain probeable. The token still maps to the configured `PLEDGEDRIVE_USER_ID`; replace that single-account adapter with your identity provider and durable account/session store before exposing the service to multiple users.
 
 ## API surface
 
@@ -58,9 +60,13 @@ Production startup fails closed if the master key or API token is missing. When 
 | `GET /metrics` | Prometheus-compatible process metrics |
 | `GET /openapi.json` | API contract |
 | `GET /api/dashboard` | Quota, files, devices, and network health |
+| `GET /api/auth/me` | Read the current session |
+| `POST /api/auth/register` | Create an account and sign in |
+| `POST /api/auth/login` | Sign in |
+| `POST /api/auth/logout` | Revoke the current session |
 | `GET /api/files?query=` | Search the authenticated account's files |
-| `POST /api/upload?name=...` | Upload an octet-stream (size-limited) |
-| `GET /api/files/:id` | Download with verified-replica failover |
+| `POST /api/upload?name=...` | Upload an octet-stream (size-limited, MIME classified) |
+| `GET /api/files/:id` | Download with verified-replica failover (`?inline=1` previews safe formats) |
 | `DELETE /api/files/:id` | Delete metadata and release replica capacity |
 | `POST /api/nodes` | Register a storage node |
 | `PATCH /api/nodes/:id/status` | Pause, resume, or retire a node |

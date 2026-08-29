@@ -2,7 +2,7 @@
   'use strict';
 
   const $ = (selector, root = document) => root.querySelector(selector);
-  const state = { dashboard: null, loading: false, uploading: false, toastTimer: null };
+  const state = { dashboard: null, user: null, authenticated: false, authMode: 'login', loading: false, uploading: false, toastTimer: null };
   const fileList = $('#files');
   const nodeList = $('#nodes');
 
@@ -27,6 +27,16 @@
   };
 
   const formatPercent = (value) => `${Math.max(0, Math.min(100, value * 100)).toFixed(1)}%`;
+
+  const categoryLabel = (category) => ({ image: 'Photo', video: 'Video', audio: 'Audio', document: 'Document', archive: 'Archive', text: 'Text', other: 'File' }[category] || 'File');
+  const categoryIcon = (category) => ({ image: '▧', video: '▶', audio: '♪', document: '▤', archive: '⌘', text: '≡', other: '↗' }[category] || '↗');
+  const canPreview = (file) => ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/avif', 'video/mp4', 'video/webm', 'video/quicktime', 'video/x-m4v', 'audio/mpeg', 'audio/wav', 'audio/ogg', 'audio/mp4', 'audio/flac', 'application/pdf'].includes(file.mimeType);
+
+  const visibleFiles = () => {
+    const query = $('#file-search').value.trim().toLowerCase();
+    const category = $('#file-filter').value;
+    return (state.dashboard?.files || []).filter((file) => (!query || file.name.toLowerCase().includes(query)) && (category === 'all' || file.category === category));
+  };
 
   const setBusy = (element, busy) => {
     if (!element) return;
@@ -88,6 +98,58 @@
     return wrapper;
   };
 
+  const openDialog = (dialog) => {
+    if (!dialog) return;
+    if (typeof dialog.showModal === 'function') {
+      try { dialog.showModal(); return; } catch { /* Fall back for embedded browsers. */ }
+    }
+    dialog.setAttribute('open', '');
+  };
+
+  const closeDialogElement = (dialog) => {
+    if (!dialog) return;
+    if (typeof dialog.close === 'function') {
+      try { dialog.close(); return; } catch { /* Fall back for embedded browsers. */ }
+    }
+    dialog.removeAttribute('open');
+  };
+
+  const previewDialog = $('#preview-dialog');
+  const openPreview = (file) => {
+    const content = $('#preview-content');
+    content.replaceChildren();
+    $('#preview-title').textContent = file.name;
+    const source = `/api/files/${encodeURIComponent(file.id)}?inline=1`;
+    if (file.category === 'image') {
+      const image = document.createElement('img');
+      image.src = source;
+      image.alt = file.name;
+      content.append(image);
+    } else if (file.category === 'video') {
+      const video = document.createElement('video');
+      video.src = source;
+      video.controls = true;
+      video.preload = 'metadata';
+      content.append(video);
+    } else if (file.category === 'audio') {
+      const audio = document.createElement('audio');
+      audio.src = source;
+      audio.controls = true;
+      content.append(audio);
+    } else if (file.mimeType === 'application/pdf') {
+      const frame = document.createElement('iframe');
+      frame.src = source;
+      frame.title = `Preview of ${file.name}`;
+      content.append(frame);
+    } else {
+      const message = document.createElement('p');
+      message.className = 'preview-message';
+      message.textContent = 'Preview is not available for this format yet. Download the original file instead.';
+      content.append(message);
+    }
+    openDialog(previewDialog);
+  };
+
   const renderFiles = (files) => {
     fileList.replaceChildren();
     if (!files.length) {
@@ -100,17 +162,26 @@
       const icon = document.createElement('span');
       icon.className = 'file-icon';
       icon.setAttribute('aria-hidden', 'true');
-      icon.textContent = '↗';
+      icon.textContent = categoryIcon(file.category);
       const details = document.createElement('div');
       details.className = 'row-details';
       const name = document.createElement('strong');
       name.textContent = file.name;
       const replicaCount = (file.chunks || []).reduce((total, chunk) => total + (chunk.replicaCount ?? chunk.replicas?.length ?? 0), 0);
       const meta = document.createElement('span');
-      meta.textContent = `${formatBytes(file.size)} · ${file.chunks?.length || 0} chunks · ${replicaCount} replicas`;
+      meta.textContent = `${categoryLabel(file.category)} · ${formatBytes(file.size)} · ${file.chunks?.length || 0} chunks · ${replicaCount} replicas`;
       details.append(name, meta);
       const actions = document.createElement('div');
       actions.className = 'row-actions';
+      if (canPreview(file)) {
+        const preview = document.createElement('button');
+        preview.type = 'button';
+        preview.className = 'text-button preview-button';
+        preview.textContent = 'Preview';
+        preview.setAttribute('aria-label', `Preview ${file.name}`);
+        preview.addEventListener('click', () => openPreview(file));
+        actions.append(preview);
+      }
       const download = document.createElement('a');
       download.className = 'text-link';
       download.href = `/api/files/${encodeURIComponent(file.id)}`;
@@ -203,9 +274,32 @@
     $('#progress').setAttribute('aria-valuenow', String(Math.round(Math.min(100, ratio * 100))));
     $('#quota-help').textContent = `Included quota: ${formatBytes(quota.quotaBytes)}`;
     $('#quota-percent').textContent = formatPercent(ratio);
-    renderFiles(dashboard.files || []);
+    renderFiles(visibleFiles());
     renderNodes(dashboard.nodes || []);
     renderStats(dashboard.network || {});
+  };
+
+  const renderAccount = () => {
+    const button = $('#account');
+    button.textContent = state.authenticated && state.user?.email ? state.user.email.split('@')[0] : 'Sign in';
+    $('#auth-form').hidden = state.authenticated;
+    $('#account-session').hidden = !state.authenticated;
+    if (state.user) {
+      $('#account-title').textContent = state.user.email?.split('@')[0] || 'Account';
+      $('#account-email').textContent = state.user.email || 'Signed-in account';
+    }
+  };
+
+  const loadSession = async () => {
+    try {
+      const session = await api('/api/auth/me');
+      state.authenticated = Boolean(session?.authenticated);
+      state.user = session?.user || null;
+    } catch {
+      state.authenticated = false;
+      state.user = null;
+    }
+    renderAccount();
   };
 
   const load = async () => {
@@ -213,10 +307,12 @@
     state.loading = true;
     setBusy($('#refresh'), true);
     try {
+      await loadSession();
       render(await api('/api/dashboard'));
     } catch (error) {
       showToast(error.message, 'error');
       $('#network-status').textContent = 'Connection unavailable';
+      if (error.status === 401) showToast('Sign in to access your cloud files.', 'info');
     } finally {
       state.loading = false;
       setBusy($('#refresh'), false);
@@ -280,11 +376,11 @@
   });
 
   const dialog = $('#dialog');
-  const closeDialog = () => dialog.close();
-  $('#add').addEventListener('click', () => dialog.showModal());
-  $('#cancel').addEventListener('click', closeDialog);
-  $('#cancel-top').addEventListener('click', closeDialog);
-  dialog.addEventListener('click', (event) => { if (event.target === dialog) closeDialog(); });
+  const closeNodeDialog = () => closeDialogElement(dialog);
+  $('#add').addEventListener('click', () => openDialog(dialog));
+  $('#cancel').addEventListener('click', closeNodeDialog);
+  $('#cancel-top').addEventListener('click', closeNodeDialog);
+  dialog.addEventListener('click', (event) => { if (event.target === dialog) closeNodeDialog(); });
   $('#node-form').addEventListener('submit', async (event) => {
     event.preventDefault();
     const save = $('#save');
@@ -293,7 +389,7 @@
     setBusy(save, true);
     try {
       await api('/api/nodes', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ deviceId: $('#device').value, region: 'IN', platform: $('#platform').value, version: '0.1.0', capacityBytes: 1000 * 1024 ** 3, pledgedBytes: pledgeGb * 1024 ** 3, bandwidthMbps: 50 }) });
-      closeDialog();
+      closeNodeDialog();
       showToast('Device registered and ready to contribute.', 'success');
       await load();
     } catch (error) {
@@ -302,6 +398,66 @@
       setBusy(save, false);
     }
   });
+
+  const authDialog = $('#auth-dialog');
+  const setAuthMode = (mode) => {
+    state.authMode = mode;
+    const registering = mode === 'register';
+    $('#auth-title').textContent = registering ? 'Create your account' : 'Sign in';
+    $('#auth-copy').textContent = registering ? 'Start with 5 GB of private cloud storage, then add devices when you are ready.' : 'Sign in to keep your files and devices tied to your account.';
+    $('#auth-submit').textContent = registering ? 'Create account' : 'Sign in';
+    $('#auth-switch').textContent = registering ? 'Already have an account? Sign in' : 'Create an account';
+    $('#auth-password').setAttribute('autocomplete', registering ? 'new-password' : 'current-password');
+  };
+  const openAccount = () => {
+    renderAccount();
+    openDialog(authDialog);
+  };
+  $('#account').addEventListener('click', openAccount);
+  $('#auth-close').addEventListener('click', () => closeDialogElement(authDialog));
+  $('#account-close').addEventListener('click', () => closeDialogElement(authDialog));
+  authDialog.addEventListener('click', (event) => { if (event.target === authDialog) closeDialogElement(authDialog); });
+  $('#auth-switch').addEventListener('click', () => setAuthMode(state.authMode === 'login' ? 'register' : 'login'));
+  $('#auth-form').addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const submit = $('#auth-submit');
+    setBusy(submit, true);
+    try {
+      const response = await api(`/api/auth/${state.authMode}`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ email: $('#auth-email').value, password: $('#auth-password').value }) });
+      state.authenticated = Boolean(response?.authenticated);
+      state.user = response?.user || null;
+      $('#auth-password').value = '';
+      closeDialogElement(authDialog);
+      renderAccount();
+      showToast(state.authMode === 'register' ? 'Account created. Your 5 GB cloud is ready.' : 'Welcome back.', 'success');
+      await load();
+    } catch (error) {
+      showToast(error.message, 'error');
+    } finally {
+      setBusy(submit, false);
+    }
+  });
+  $('#logout').addEventListener('click', async () => {
+    const logout = $('#logout');
+    setBusy(logout, true);
+    try {
+      await api('/api/auth/logout', { method: 'POST' });
+      state.authenticated = false;
+      state.user = null;
+      closeDialogElement(authDialog);
+      renderAccount();
+      showToast('You are signed out.', 'success');
+      await load();
+    } catch (error) {
+      showToast(error.message, 'error');
+    } finally {
+      setBusy(logout, false);
+    }
+  });
+  $('#preview-close').addEventListener('click', () => closeDialogElement(previewDialog));
+  previewDialog.addEventListener('click', (event) => { if (event.target === previewDialog) closeDialogElement(previewDialog); });
+  setAuthMode('login');
+  renderAccount();
 
   $('#repair').addEventListener('click', async () => {
     const repair = $('#repair');
@@ -319,9 +475,9 @@
 
   $('#file-search').addEventListener('input', (event) => {
     if (!state.dashboard) return;
-    const query = event.target.value.trim().toLowerCase();
-    renderFiles((state.dashboard.files || []).filter((file) => file.name.toLowerCase().includes(query)));
+    renderFiles(visibleFiles());
   });
+  $('#file-filter').addEventListener('change', () => { if (state.dashboard) renderFiles(visibleFiles()); });
   window.addEventListener('online', load);
   load();
 })();

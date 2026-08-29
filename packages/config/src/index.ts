@@ -22,6 +22,7 @@ export interface AppConfig {
   stateFile: string;
   webRoot: string;
   maxUploadBytes: number;
+  sessionTtlSeconds: number;
   apiToken?: string;
   allowedOrigin?: string;
   masterKey: Buffer;
@@ -68,6 +69,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     stateFile,
     webRoot,
     maxUploadBytes: positiveInteger(env.PLEDGEDRIVE_MAX_UPLOAD_BYTES, product.maxUploadBytes, 'PLEDGEDRIVE_MAX_UPLOAD_BYTES'),
+    sessionTtlSeconds: positiveInteger(env.PLEDGEDRIVE_SESSION_TTL_SECONDS, 7 * 24 * 60 * 60, 'PLEDGEDRIVE_SESSION_TTL_SECONDS'),
     apiToken,
     allowedOrigin,
     masterKey: masterKeyFrom(env.PLEDGEDRIVE_MASTER_KEY, environment),

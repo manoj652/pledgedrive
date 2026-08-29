@@ -15,7 +15,7 @@
           <span class="mark" aria-hidden="true">P</span>
           <span class="brand-copy"><strong>PledgeDrive</strong><span>Your cloud. Powered by everyone's spare storage.</span></span>
         </a>
-        <div class="network-pill" aria-live="polite"><span class="status-dot" aria-hidden="true"></span><span id="network-status">Network live</span></div>
+        <div class="header-actions"><div class="network-pill" aria-live="polite"><span class="status-dot" aria-hidden="true"></span><span id="network-status">Network live</span></div><button id="account" class="account-button" type="button">Sign in</button></div>
       </header>
 
       <main>
@@ -27,7 +27,7 @@
             <div class="hero-actions">
               <label class="button button-primary upload-button" for="upload">
                 <span id="upload-label">Upload a file</span>
-                <input id="upload" type="file" aria-describedby="upload-status">
+                <input id="upload" type="file" accept="image/*,video/*,audio/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.zip,.tar,.gz,.txt,.md,.csv,.json" aria-describedby="upload-status">
               </label>
               <button id="refresh" class="button button-secondary" type="button">Refresh</button>
             </div>
@@ -46,7 +46,7 @@
         <section class="content-section" aria-labelledby="files-title">
           <div class="section-heading">
             <div><p class="eyebrow">YOUR CLOUD</p><h2 id="files-title">Your files</h2></div>
-            <label class="search-field" for="file-search"><span class="visually-hidden">Search files</span><span aria-hidden="true">⌕</span><input id="file-search" type="search" placeholder="Search files" autocomplete="off"></label>
+            <div class="file-tools"><label class="search-field" for="file-search"><span class="visually-hidden">Search files</span><span aria-hidden="true">⌕</span><input id="file-search" type="search" placeholder="Search files" autocomplete="off"></label><label class="filter-field" for="file-filter"><span class="visually-hidden">Filter by file type</span><select id="file-filter"><option value="all">All types</option><option value="image">Photos</option><option value="video">Videos</option><option value="audio">Audio</option><option value="document">Documents</option><option value="text">Text</option><option value="archive">Archives</option></select></label></div>
           </div>
           <div id="files" class="file-list" aria-live="polite"></div>
         </section>
@@ -80,6 +80,22 @@
       </form>
     </dialog>
 
-    <script src="/app.js" defer></script>
+    <dialog id="auth-dialog" aria-labelledby="auth-title">
+      <form id="auth-form">
+        <div class="dialog-heading"><div><p class="eyebrow">YOUR ACCOUNT</p><h2 id="auth-title">Sign in</h2></div><button id="auth-close" class="icon-button" type="button" aria-label="Close account dialog">×</button></div>
+        <p id="auth-copy" class="dialog-copy">Sign in to keep your files and devices tied to your account.</p>
+        <label for="auth-email">Email<input id="auth-email" name="email" type="email" autocomplete="email" placeholder="you@example.com" maxlength="254" required></label>
+        <label for="auth-password">Password<input id="auth-password" name="password" type="password" autocomplete="current-password" minlength="10" maxlength="256" required></label>
+        <div class="dialog-actions"><button id="auth-switch" class="text-button" type="button">Create an account</button><button id="auth-submit" class="button button-primary" type="submit">Sign in</button></div>
+      </form>
+      <div id="account-session" hidden><div class="dialog-heading"><div><p class="eyebrow">SIGNED IN</p><h2 id="account-title">Account</h2></div><button id="account-close" class="icon-button" type="button" aria-label="Close account dialog">×</button></div><p id="account-email" class="dialog-copy"></p><div class="dialog-actions"><button id="logout" class="button button-secondary" type="button">Sign out</button></div></div>
+    </dialog>
+
+    <dialog id="preview-dialog" aria-labelledby="preview-title">
+      <div class="dialog-heading"><div><p class="eyebrow">FILE PREVIEW</p><h2 id="preview-title">Preview</h2></div><button id="preview-close" class="icon-button" type="button" aria-label="Close preview">×</button></div>
+      <div id="preview-content" class="preview-content"></div>
+    </dialog>
+
+    <script src="/app.js?v=3" defer></script>
   </body>
 </html>

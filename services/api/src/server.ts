@@ -5,7 +5,7 @@ import { extname, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { randomUUID } from 'node:crypto';
 import { loadConfig, product, type AppConfig } from '../../../packages/config/src/index.js';
-import type { NodeStatus } from '../../../packages/types/src/index.js';
+import type { NodeStatus, Platform } from '../../../packages/types/src/index.js';
 import { DomainError, PledgeDriveService } from './domain.js';
 import { JsonStateStore } from './state-store.js';
 
@@ -35,6 +35,10 @@ const OPENAPI = {
   paths: {
     '/health': { get: { summary: 'Liveness probe', responses: { '200': { description: 'Service is alive' } } } },
     '/ready': { get: { summary: 'Readiness probe', responses: { '200': { description: 'Service is ready' } } } },
+    '/api/auth/me': { get: { summary: 'Read current session' } },
+    '/api/auth/register': { post: { summary: 'Create an account and session' } },
+    '/api/auth/login': { post: { summary: 'Sign in and create a session' } },
+    '/api/auth/logout': { post: { summary: 'Revoke the current session' } },
     '/api/dashboard': { get: { summary: 'Account dashboard', responses: { '200': { description: 'Account, files, nodes, and network state' } } } },
     '/api/files': { get: { summary: 'List files', parameters: [{ name: 'query', in: 'query', schema: { type: 'string' } }] } },
     '/api/upload': { post: { summary: 'Upload a file', parameters: [{ name: 'name', in: 'query', required: true, schema: { type: 'string' } }], requestBody: { required: true, content: { 'application/octet-stream': { schema: { type: 'string', format: 'binary' } } } } } },
@@ -135,11 +139,40 @@ async function readJson(req: IncomingMessage): Promise<Record<string, unknown>> 
   }
 }
 
-function authUser(req: IncomingMessage, config: AppConfig): string {
-  if (!config.apiToken) return config.userId;
-  const authorization = req.headers.authorization;
-  if (authorization !== `Bearer ${config.apiToken}`) throw new HttpError(401, 'UNAUTHORIZED', 'Authentication required');
-  return config.userId;
+function parseCookies(header: string | undefined): Record<string, string> {
+  if (!header) return {};
+  return Object.fromEntries(header.split(';').map(part => part.trim().split('=', 2)).filter(([name, value]) => name && value).map(([name, value]) => {
+    try { return [name, decodeURIComponent(value)] as const; } catch { return [name, ''] as const; }
+  }));
+}
+
+function sessionToken(req: IncomingMessage): string | undefined {
+  return parseCookies(req.headers.cookie).pledgedrive_session;
+}
+
+function setSessionCookie(res: ServerResponse, token: string, config: AppConfig): void {
+  const secure = config.environment === 'production' ? '; Secure' : '';
+  res.setHeader('set-cookie', `pledgedrive_session=${encodeURIComponent(token)}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${config.sessionTtlSeconds}${secure}`);
+}
+
+function clearSessionCookie(res: ServerResponse, config: AppConfig): void {
+  const secure = config.environment === 'production' ? '; Secure' : '';
+  res.setHeader('set-cookie', `pledgedrive_session=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0${secure}`);
+}
+
+function authenticatedUser(req: IncomingMessage, config: AppConfig, service: PledgeDriveService): { userId: string; authenticated: boolean } | undefined {
+  const bearer = req.headers.authorization;
+  if (config.apiToken && bearer === `Bearer ${config.apiToken}`) return { userId: config.userId, authenticated: true };
+  const sessionUser = service.resolveSession(sessionToken(req));
+  if (sessionUser) return { userId: sessionUser, authenticated: true };
+  if (config.environment !== 'production' && !config.apiToken) return { userId: config.userId, authenticated: false };
+  return undefined;
+}
+
+function authUser(req: IncomingMessage, config: AppConfig, service: PledgeDriveService): string {
+  const identity = authenticatedUser(req, config, service);
+  if (!identity) throw new HttpError(401, 'UNAUTHORIZED', 'Authentication required');
+  return identity.userId;
 }
 
 function routeMetric(pathname: string): string {
@@ -211,7 +244,29 @@ export function createPledgeDriveServer({ service, config }: ServerDependencies)
         return res.end(body);
       }
       if (pathname === '/openapi.json' && req.method === 'GET') return respondJson(res, config, requestId, 200, OPENAPI);
-      const userId = pathname.startsWith('/api/') ? authUser(req, config) : config.userId;
+      if (pathname === '/api/auth/me' && req.method === 'GET') {
+        const identity = authenticatedUser(req, config, service);
+        const authenticated = Boolean(identity?.authenticated);
+        return respondJson(res, config, requestId, 200, { authenticated, user: authenticated ? service.accountView(identity!.userId) || { id: identity!.userId, email: null } : null });
+      }
+      if (pathname === '/api/auth/register' && req.method === 'POST') {
+        const input = await readJson(req);
+        const account = service.registerAccount(input.email as string, input.password as string);
+        setSessionCookie(res, service.createSession(account.id), config);
+        return respondJson(res, config, requestId, 201, { authenticated: true, user: service.accountView(account.id) });
+      }
+      if (pathname === '/api/auth/login' && req.method === 'POST') {
+        const input = await readJson(req);
+        const account = service.authenticateAccount(input.email as string, input.password as string);
+        setSessionCookie(res, service.createSession(account.id), config);
+        return respondJson(res, config, requestId, 200, { authenticated: true, user: service.accountView(account.id) });
+      }
+      if (pathname === '/api/auth/logout' && req.method === 'POST') {
+        service.revokeSession(sessionToken(req));
+        clearSessionCookie(res, config);
+        return respondJson(res, config, requestId, 200, { authenticated: false, user: null });
+      }
+      const userId = pathname.startsWith('/api/') ? authUser(req, config, service) : config.userId;
       if (pathname === '/api/dashboard' && req.method === 'GET') return respondJson(res, config, requestId, 200, service.dashboard(userId));
       if (pathname === '/api/files' && req.method === 'GET') {
         const query = new URL(req.url || '/', `http://${req.headers.host || 'localhost'}`).searchParams.get('query')?.trim().toLowerCase() || '';
@@ -219,10 +274,11 @@ export function createPledgeDriveServer({ service, config }: ServerDependencies)
         return respondJson(res, config, requestId, 200, { files });
       }
       if (pathname === '/api/upload' && req.method === 'POST') {
-        const name = new URL(req.url || '/', `http://${req.headers.host || 'localhost'}`).searchParams.get('name') || 'upload.bin';
-        const file = service.upload(userId, name, await readBody(req, config.maxUploadBytes));
+        const requestUrl = new URL(req.url || '/', `http://${req.headers.host || 'localhost'}`);
+        const name = requestUrl.searchParams.get('name') || 'upload.bin';
+        const file = service.upload(userId, name, await readBody(req, config.maxUploadBytes), req.headers['content-type'] || 'application/octet-stream');
         res.setHeader('location', `/api/files/${file.id}`);
-        return respondJson(res, config, requestId, 201, { id: file.id, name: file.name, size: file.size, chunks: file.chunks.length });
+        return respondJson(res, config, requestId, 201, { id: file.id, name: file.name, size: file.size, mimeType: file.mimeType, category: file.category, chunks: file.chunks.length });
       }
       const fileMatch = pathname.match(/^\/api\/files\/([^/]+)$/);
       if (fileMatch && (req.method === 'GET' || req.method === 'HEAD' || req.method === 'DELETE')) {
@@ -231,13 +287,16 @@ export function createPledgeDriveServer({ service, config }: ServerDependencies)
           service.deleteFile(userId, fileId);
           return respondEmpty(res, config, requestId, 204);
         }
-        const file = service.files.get(fileId);
+        const file = service.fileFor(userId, fileId);
         const bytes = service.download(userId, fileId);
-        if (!file) throw new DomainError('FILE_NOT_FOUND', 'File not found', 404);
         commonHeaders(res, config, requestId);
-        res.setHeader('content-type', 'application/octet-stream');
+        const requestUrl = new URL(req.url || '/', `http://${req.headers.host || 'localhost'}`);
+        const inlineRequested = requestUrl.searchParams.get('inline') === '1';
+        const safeInlineMime = new Set(['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/avif', 'video/mp4', 'video/webm', 'video/quicktime', 'video/x-m4v', 'audio/mpeg', 'audio/wav', 'audio/ogg', 'audio/mp4', 'audio/flac', 'application/pdf']);
+        const inline = inlineRequested && safeInlineMime.has(file.mimeType);
+        res.setHeader('content-type', inline ? file.mimeType : 'application/octet-stream');
         res.setHeader('content-length', bytes.length);
-        res.setHeader('content-disposition', `attachment; filename*=UTF-8''${encodeURIComponent(file.name)}`);
+        res.setHeader('content-disposition', `${inline ? 'inline' : 'attachment'}; filename*=UTF-8''${encodeURIComponent(file.name)}`);
         res.setHeader('cache-control', 'private, no-store');
         if (req.method === 'HEAD') return res.end();
         return res.end(bytes);
@@ -249,7 +308,7 @@ export function createPledgeDriveServer({ service, config }: ServerDependencies)
           deviceId: String(input.deviceId ?? ''),
           publicKey: String(input.publicKey ?? 'local-device'),
           region: String(input.region ?? 'IN'),
-          platform: input.platform as never,
+          platform: input.platform as Platform,
           version: String(input.version ?? product.minNodeVersion),
           capacityBytes: Number(input.capacityBytes),
           pledgedBytes: Number(input.pledgedBytes),
@@ -273,7 +332,9 @@ export function createPledgeDriveServer({ service, config }: ServerDependencies)
       }
       commonHeaders(res, config, requestId);
       res.setHeader('content-type', contentType(pathname === '/' ? 'index.html' : pathname));
-      res.setHeader('cache-control', pathname === '/' || pathname.endsWith('.html') ? 'no-cache' : 'public, max-age=3600');
+      const assetExtension = extname(pathname).toLowerCase();
+      const mutableAsset = pathname === '/' || pathname.endsWith('.html') || assetExtension === '.js' || assetExtension === '.css';
+      res.setHeader('cache-control', mutableAsset ? 'no-cache' : 'public, max-age=3600');
       if (pathname === '/' || pathname.endsWith('.html')) res.setHeader('content-security-policy', "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'");
       res.setHeader('content-length', file.length);
       return res.end(file);
@@ -297,7 +358,7 @@ export function createPledgeDriveServer({ service, config }: ServerDependencies)
 export function startServer(): Server {
   const config = loadConfig();
   const store = new JsonStateStore(config.stateFile);
-  const service = new PledgeDriveService({ store, masterKey: config.masterKey, maxUploadBytes: config.maxUploadBytes });
+  const service = new PledgeDriveService({ store, masterKey: config.masterKey, maxUploadBytes: config.maxUploadBytes, sessionTtlMs: config.sessionTtlSeconds * 1000 });
   if (config.environment !== 'production' && service.nodes.size === 0) {
     for (const [deviceId, platform, region] of [['Windows PC', 'windows', 'IN'], ['Linux NAS', 'linux', 'DE'], ['Mac mini', 'macos', 'US']] as const) {
       service.registerNode({ userId: config.userId, deviceId, publicKey: 'local-demo-key', region, platform, version: product.minNodeVersion, capacityBytes: 2 * 1024 ** 4, pledgedBytes: 500 * 1024 ** 3, bandwidthMbps: 100 });

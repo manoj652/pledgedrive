@@ -10,6 +10,7 @@
 - Request body limits, request IDs, safe static-path resolution, CSP, `nosniff`, frame and referrer protections, and loopback-only compose bindings.
 - Production configuration fails closed without `PLEDGEDRIVE_MASTER_KEY` and a strong `PLEDGEDRIVE_API_TOKEN`.
 - Transaction rollback on rejected mutations and atomic state persistence.
+- Account passwords use per-account salts and Node's scrypt KDF; sessions store only SHA-256 token hashes and are revocable server-side.
 
 ## Not yet a public-cloud security claim
 

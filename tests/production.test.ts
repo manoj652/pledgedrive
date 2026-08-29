@@ -15,6 +15,20 @@ test('production configuration fails closed without real secrets', () => {
   assert.equal(config.exposeErrors, false);
 });
 
+test('accounts use salted password hashes and revocable sessions', () => {
+  const service = new PledgeDriveService({ masterKey });
+  const account = service.registerAccount('User@Example.com', 'correct horse battery');
+  assert.equal(account.email, 'user@example.com');
+  assert.notEqual(account.passwordHash, 'correct horse battery');
+  assert.notEqual(account.passwordSalt, '');
+  const token = service.createSession(account.id);
+  assert.equal(service.resolveSession(token), account.id);
+  assert.deepEqual(service.accountView(account.id), { id: account.id, email: 'user@example.com', createdAt: account.createdAt });
+  assert.throws(() => service.authenticateAccount('user@example.com', 'wrong password'), /incorrect/);
+  service.revokeSession(token);
+  assert.equal(service.resolveSession(token), undefined);
+});
+
 function addNode(service: PledgeDriveService, userId: string, deviceId = userId, pledge = 800_000) {
   return service.registerNode({ userId, deviceId, publicKey: `pk-${deviceId}`, region: 'IN', platform: 'linux', version: '0.1.0', capacityBytes: 1_000_000, pledgedBytes: pledge, bandwidthMbps: 100 });
 }
