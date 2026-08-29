@@ -2,6 +2,8 @@
 
 **Your cloud. Powered by everyone's spare storage.**
 
+![PledgeDrive dashboard](pledgedrive-dashboard.png)
+
 This repository is an executable MVP of the PledgeDrive control plane and web client. It is deliberately candid about scope: the working local path has a web UI, API, quota accounting, file/chunk metadata, deterministic replica placement, integrity checks, failure repair, node state transitions, and append-only credit entries. Native file-system sync, persistent PostgreSQL/Redis repositories, signed node authentication, and browser end-to-end key handling are the next build phases—not simulated features.
 
 ## Architecture
