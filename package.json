@@ -5,12 +5,15 @@
   "type": "module",
   "scripts": {
     "dev": "npm run build && node dist/services/api/src/server.js",
+    "start": "node dist/services/api/src/server.js",
     "build": "tsc -p tsconfig.json && node scripts/copy-web.mjs",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "lint": "node --check apps/web/public/app.js",
     "test": "npm run build && node --test dist/tests/**/*.test.js",
     "node": "npm run build && node dist/node/core/src/cli.js",
-    "demo": "npm run build && node dist/tests/distributed.integration.test.js"
+    "demo": "npm run build && node dist/tests/distributed.integration.test.js",
+    "check": "npm run typecheck && npm run lint && npm test",
+    "smoke": "node scripts/smoke.mjs"
   },
   "devDependencies": { "@types/node": "^22.10.2", "typescript": "^5.7.2" }
 }

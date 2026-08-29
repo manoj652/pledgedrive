@@ -1,1 +1,85 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>PledgeDrive</title><link rel="stylesheet" href="/styles.css"></head><body><main><header><div class="mark">P</div><div><h1>PledgeDrive</h1><p>Your cloud. Powered by everyone's spare storage.</p></div><span class="live">● Network live</span></header><section class="hero"><div><p class="eyebrow">PERSONAL CLOUD</p><h2>Files that travel farther than one data center.</h2><p>Private storage, replicated across independent nodes.</p><label class="upload"><input id="upload" type="file">Upload encrypted-ready file</label></div><div class="quota"><p>Cloud storage</p><strong id="usage">—</strong><div class="bar"><i id="progress"></i></div><small>Included quota: 5 GB</small></div></section><section><div class="section-title"><h2>Your files</h2><button id="refresh">Refresh</button></div><div id="files" class="files"></div></section><section><div class="section-title"><div><p class="eyebrow">CONTRIBUTE STORAGE</p><h2>Your devices</h2></div><button id="add">+ Add device</button></div><div id="nodes" class="nodes"></div></section><section class="network"><div><p class="eyebrow">NETWORK OVERVIEW</p><h2>Distributed by design</h2></div><div id="stats"></div><button id="repair">Repair degraded replicas</button></section></main><dialog id="dialog"><form method="dialog"><h2>Contribute storage</h2><label>Device name<input id="device" value="Home Server"></label><label>Pledged GB<input id="pledge" value="50" type="number" min="1"></label><menu><button>Cancel</button><button id="save" value="default">Add node</button></menu></form></dialog><script src="/app.js"></script></body></html>
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="PledgeDrive private cloud storage, replicated across independent nodes.">
+    <meta name="theme-color" content="#071e22">
+    <title>PledgeDrive · Personal cloud</title>
+    <link rel="stylesheet" href="/styles.css">
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="site-header">
+        <a class="brand" href="/" aria-label="PledgeDrive home">
+          <span class="mark" aria-hidden="true">P</span>
+          <span class="brand-copy"><strong>PledgeDrive</strong><span>Your cloud. Powered by everyone's spare storage.</span></span>
+        </a>
+        <div class="network-pill" aria-live="polite"><span class="status-dot" aria-hidden="true"></span><span id="network-status">Network live</span></div>
+      </header>
+
+      <main>
+        <section class="hero" aria-labelledby="hero-title">
+          <div class="hero-copy">
+            <p class="eyebrow">PERSONAL CLOUD</p>
+            <h1 id="hero-title">Files that travel farther than one data center.</h1>
+            <p class="lede">Private storage, encrypted at rest, and replicated across independent nodes.</p>
+            <div class="hero-actions">
+              <label class="button button-primary upload-button" for="upload">
+                <span id="upload-label">Upload a file</span>
+                <input id="upload" type="file" aria-describedby="upload-status">
+              </label>
+              <button id="refresh" class="button button-secondary" type="button">Refresh</button>
+            </div>
+            <p id="upload-status" class="inline-status" role="status" aria-live="polite" hidden></p>
+          </div>
+
+          <aside class="quota-card" aria-labelledby="quota-title">
+            <div class="card-kicker"><span class="shield-icon" aria-hidden="true">◆</span><span>Private storage</span></div>
+            <h2 id="quota-title">Cloud storage</h2>
+            <strong id="usage" class="quota-value">—</strong>
+            <div id="progress" class="progress-track" role="progressbar" aria-label="Storage used" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><span id="progress-fill"></span></div>
+            <div class="quota-foot"><span id="quota-help">Included quota: 5 GB</span><span id="quota-percent">0%</span></div>
+          </aside>
+        </section>
+
+        <section class="content-section" aria-labelledby="files-title">
+          <div class="section-heading">
+            <div><p class="eyebrow">YOUR CLOUD</p><h2 id="files-title">Your files</h2></div>
+            <label class="search-field" for="file-search"><span class="visually-hidden">Search files</span><span aria-hidden="true">⌕</span><input id="file-search" type="search" placeholder="Search files" autocomplete="off"></label>
+          </div>
+          <div id="files" class="file-list" aria-live="polite"></div>
+        </section>
+
+        <section class="content-section" aria-labelledby="nodes-title">
+          <div class="section-heading">
+            <div><p class="eyebrow">CONTRIBUTE STORAGE</p><h2 id="nodes-title">Your devices</h2></div>
+            <button id="add" class="button button-secondary" type="button">+ Add device</button>
+          </div>
+          <div id="nodes" class="node-list" aria-live="polite"></div>
+        </section>
+
+        <section class="network-card" aria-labelledby="network-title">
+          <div class="network-intro"><p class="eyebrow">NETWORK OVERVIEW</p><h2 id="network-title">Distributed by design</h2><p>Healthy replicas are verified before they are counted as usable.</p></div>
+          <div id="stats" class="stat-grid" aria-live="polite"></div>
+          <button id="repair" class="button button-primary" type="button">Repair replicas</button>
+        </section>
+      </main>
+    </div>
+
+    <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+
+    <dialog id="dialog" aria-labelledby="dialog-title">
+      <form id="node-form">
+        <div class="dialog-heading"><div><p class="eyebrow">NEW CONTRIBUTION</p><h2 id="dialog-title">Contribute storage</h2></div><button id="cancel-top" class="icon-button" type="button" aria-label="Close dialog">×</button></div>
+        <p class="dialog-copy">Your node stores encrypted chunks for the network. You can pause it at any time.</p>
+        <label for="device">Device name<input id="device" name="device" value="Home Server" maxlength="128" required></label>
+        <div class="form-grid"><label for="platform">Platform<select id="platform" name="platform"><option value="linux">Linux / NAS</option><option value="windows">Windows</option><option value="macos">macOS</option><option value="android">Android</option><option value="ios">iPhone / iPad</option></select></label><label for="pledge">Pledged GB<input id="pledge" name="pledge" value="50" type="number" min="1" max="100000" step="1" required></label></div>
+        <p class="form-hint">A 1000 GB physical capacity is reserved for this local demo node.</p>
+        <div class="dialog-actions"><button id="cancel" class="button button-secondary" type="button">Cancel</button><button id="save" class="button button-primary" type="submit">Add node</button></div>
+      </form>
+    </dialog>
+
+    <script src="/app.js" defer></script>
+  </body>
+</html>

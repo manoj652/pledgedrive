@@ -1,10 +1,60 @@
 services:
+  api:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    environment:
+      NODE_ENV: development
+      PLEDGEDRIVE_HOST: 0.0.0.0
+      PLEDGEDRIVE_PORT: 8787
+      PLEDGEDRIVE_DATA_DIR: /app/data
+      PLEDGEDRIVE_STATE_FILE: /app/data/state.json
+      PLEDGEDRIVE_WEB_ROOT: /app/dist/apps/web/public
+      PLEDGEDRIVE_MASTER_KEY: ${PLEDGEDRIVE_MASTER_KEY:-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=}
+      PLEDGEDRIVE_API_TOKEN: ${PLEDGEDRIVE_API_TOKEN:-}
+      DATABASE_URL: postgresql://pledgedrive:${POSTGRES_PASSWORD:-pledgedrive-dev-only}@postgres:5432/pledgedrive
+      REDIS_URL: redis://redis:6379
+    ports:
+      - "127.0.0.1:8787:8787"
+    volumes:
+      - pledgedrive-data:/app/data
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
   postgres:
     image: postgres:16-alpine
-    environment: { POSTGRES_USER: pledgedrive, POSTGRES_PASSWORD: pledgedrive, POSTGRES_DB: pledgedrive }
-    ports: ["5432:5432"]
-    volumes: ["postgres-data:/var/lib/postgresql/data"]
+    environment:
+      POSTGRES_USER: pledgedrive
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-pledgedrive-dev-only}
+      POSTGRES_DB: pledgedrive
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U pledgedrive -d pledgedrive"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   redis:
     image: redis:7-alpine
-    ports: ["6379:6379"]
-volumes: { postgres-data: {} }
+    command: ["redis-server", "--appendonly", "yes"]
+    ports:
+      - "127.0.0.1:6379:6379"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  pledgedrive-data: {}
+  postgres-data: {}
+  redis-data: {}

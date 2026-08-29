@@ -1,0 +1,8 @@
+node_modules
+dist
+data
+.env
+.git
+.github
+pledgedrive-dashboard.png
+tests
