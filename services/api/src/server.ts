@@ -359,11 +359,6 @@ export function startServer(): Server {
   const config = loadConfig();
   const store = new JsonStateStore(config.stateFile);
   const service = new PledgeDriveService({ store, masterKey: config.masterKey, maxUploadBytes: config.maxUploadBytes, sessionTtlMs: config.sessionTtlSeconds * 1000 });
-  if (config.environment !== 'production' && service.nodes.size === 0) {
-    for (const [deviceId, platform, region] of [['Windows PC', 'windows', 'IN'], ['Linux NAS', 'linux', 'DE'], ['Mac mini', 'macos', 'US']] as const) {
-      service.registerNode({ userId: config.userId, deviceId, publicKey: 'local-demo-key', region, platform, version: product.minNodeVersion, capacityBytes: 2 * 1024 ** 4, pledgedBytes: 500 * 1024 ** 3, bandwidthMbps: 100 });
-    }
-  }
   const server = createPledgeDriveServer({ service, config });
   const displayHost = config.host.includes(':') ? `[${config.host}]` : config.host;
   server.listen(config.port, config.host, () => console.log(JSON.stringify({ level: 'info', service: product.name, url: `http://${displayHost}:${config.port}`, environment: config.environment, stateFile: config.stateFile })));

@@ -215,7 +215,7 @@
   const renderNodes = (nodes) => {
     nodeList.replaceChildren();
     if (!nodes.length) {
-      nodeList.append(emptyState('No contribution devices', 'Add a desktop, server, or NAS node to help store encrypted replicas.'));
+      nodeList.append(emptyState('No registered storage nodes', 'Register a desktop, server, or NAS node to contribute encrypted capacity.'));
       return;
     }
     for (const node of nodes) {
@@ -384,11 +384,12 @@
   $('#node-form').addEventListener('submit', async (event) => {
     event.preventDefault();
     const save = $('#save');
+    const capacityGb = Number($('#capacity').value);
     const pledgeGb = Number($('#pledge').value);
-    if (!Number.isSafeInteger(pledgeGb) || pledgeGb < 1) return showToast('Enter a valid pledged capacity.', 'error');
+    if (!Number.isSafeInteger(capacityGb) || capacityGb < 1 || !Number.isSafeInteger(pledgeGb) || pledgeGb < 1 || pledgeGb > capacityGb) return showToast('Enter valid physical and pledged capacity values.', 'error');
     setBusy(save, true);
     try {
-      await api('/api/nodes', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ deviceId: $('#device').value, region: 'IN', platform: $('#platform').value, version: '0.1.0', capacityBytes: 1000 * 1024 ** 3, pledgedBytes: pledgeGb * 1024 ** 3, bandwidthMbps: 50 }) });
+      await api('/api/nodes', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ deviceId: $('#device').value, region: 'IN', platform: $('#platform').value, version: '0.1.0', capacityBytes: capacityGb * 1024 ** 3, pledgedBytes: pledgeGb * 1024 ** 3, bandwidthMbps: 50 }) });
       closeNodeDialog();
       showToast('Device registered and ready to contribute.', 'success');
       await load();

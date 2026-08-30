@@ -26,7 +26,7 @@ npm run dev
 # open http://localhost:8787
 ```
 
-The development server seeds three provider nodes on first start and stores state under `./data/state.json`. To reset demo data, stop the server and remove that specific `data` directory.
+The server does not seed provider nodes. A fresh install starts with an empty network; register storage nodes through the authenticated API or after signing in to the web client, and state is stored under `./data/state.json` by default.
 
 Quality gates:
 
@@ -46,10 +46,11 @@ Copy `.env.example` to `.env` and set values for your environment. Important pro
 NODE_ENV=production
 PLEDGEDRIVE_MASTER_KEY=<32-byte base64 or 64-character hex key>
 PLEDGEDRIVE_API_TOKEN=<at least 32 random characters>
+PLEDGEDRIVE_USER_ID=<stable operator account id>
 PLEDGEDRIVE_STATE_FILE=/var/lib/pledgedrive/state.json
 ```
 
-Production startup fails closed if the master key or API token is missing. When `PLEDGEDRIVE_API_TOKEN` is set, service-to-service API calls use `Authorization: Bearer <token>`; browser accounts use the revocable HttpOnly session cookie. Health, readiness, metrics, OpenAPI, and static assets remain probeable. The token still maps to the configured `PLEDGEDRIVE_USER_ID`; replace that single-account adapter with your identity provider and durable account/session store before exposing the service to multiple users.
+Production startup fails closed if the master key, API token, or operator user ID is missing. When `PLEDGEDRIVE_API_TOKEN` is set, service-to-service API calls use `Authorization: Bearer <token>`; browser accounts use the revocable HttpOnly session cookie. Health, readiness, metrics, OpenAPI, and static assets remain probeable. The token maps to the configured operator user ID; replace that single-account adapter with your identity provider and durable account/session store before exposing the service to multiple users.
 
 ## API surface
 

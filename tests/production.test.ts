@@ -10,8 +10,9 @@ const masterKey = Buffer.alloc(32, 7);
 
 test('production configuration fails closed without real secrets', () => {
   assert.throws(() => loadConfig({ NODE_ENV: 'production', PLEDGEDRIVE_API_TOKEN: 'too-short' }), /PLEDGEDRIVE_API_TOKEN/);
-  assert.throws(() => loadConfig({ NODE_ENV: 'production', PLEDGEDRIVE_API_TOKEN: 'x'.repeat(32) }), /PLEDGEDRIVE_MASTER_KEY/);
-  const config = loadConfig({ NODE_ENV: 'production', PLEDGEDRIVE_API_TOKEN: 'x'.repeat(32), PLEDGEDRIVE_MASTER_KEY: 'a'.repeat(64) });
+  assert.throws(() => loadConfig({ NODE_ENV: 'production', PLEDGEDRIVE_API_TOKEN: 'x'.repeat(32), PLEDGEDRIVE_MASTER_KEY: 'a'.repeat(64) }), /PLEDGEDRIVE_USER_ID/);
+  assert.throws(() => loadConfig({ NODE_ENV: 'production', PLEDGEDRIVE_API_TOKEN: 'x'.repeat(32), PLEDGEDRIVE_USER_ID: 'operator' }), /PLEDGEDRIVE_MASTER_KEY/);
+  const config = loadConfig({ NODE_ENV: 'production', PLEDGEDRIVE_API_TOKEN: 'x'.repeat(32), PLEDGEDRIVE_USER_ID: 'operator', PLEDGEDRIVE_MASTER_KEY: 'a'.repeat(64) });
   assert.equal(config.exposeErrors, false);
 });
 

@@ -1,4 +1,4 @@
--- PostgreSQL production schema. The local demo currently uses an in-memory repository.
+-- PostgreSQL production schema. The default runnable core uses an atomic JSON repository; wire this schema for durable multi-process deployments.
 create type node_status as enum ('REGISTERING','ONLINE','DEGRADED','PAUSED','OFFLINE','SUSPENDED','RETIRED');
 create table users (id uuid primary key, email text unique not null, password_salt text not null, password_hash text not null, created_at timestamptz not null default now());
 create table sessions (token_hash text primary key, user_id uuid not null references users(id) on delete cascade, expires_at timestamptz not null, created_at timestamptz not null default now());

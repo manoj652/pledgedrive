@@ -58,13 +58,16 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
   const webRoot = resolve(env.PLEDGEDRIVE_WEB_ROOT || './dist/apps/web/public');
   const apiToken = env.PLEDGEDRIVE_API_TOKEN?.trim() || undefined;
   if (environment === 'production' && (!apiToken || apiToken.length < 32)) throw new Error('PLEDGEDRIVE_API_TOKEN must be at least 32 characters in production');
+  const configuredUserId = env.PLEDGEDRIVE_USER_ID?.trim() || undefined;
+  if (environment === 'production' && !configuredUserId) throw new Error('PLEDGEDRIVE_USER_ID is required in production');
+  if (configuredUserId && (configuredUserId.length > 128 || /[\u0000-\u001f\u007f]/.test(configuredUserId))) throw new Error('PLEDGEDRIVE_USER_ID must be 1–128 safe characters');
   const allowedOrigin = env.PLEDGEDRIVE_ALLOWED_ORIGIN?.trim() || undefined;
   if (allowedOrigin && allowedOrigin === '*') throw new Error('Wildcard CORS origins are not allowed');
   return {
     environment,
     port: positiveInteger(env.PLEDGEDRIVE_PORT, 8787, 'PLEDGEDRIVE_PORT'),
     host: env.PLEDGEDRIVE_HOST || (environment === 'production' ? '127.0.0.1' : '::'),
-    userId: env.PLEDGEDRIVE_USER_ID || 'demo-user',
+    userId: configuredUserId || 'local-user',
     dataDir,
     stateFile,
     webRoot,

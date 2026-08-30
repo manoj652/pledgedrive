@@ -118,7 +118,7 @@ dialog form { display: grid; gap: 16px; }
 dialog label { display: grid; gap: 7px; color: #3f6562; font-size: 12px; font-weight: 700; }
 dialog input, dialog select { width: 100%; border: 1px solid #a6c2bd; border-radius: 8px; padding: 10px; outline: 0; background: white; color: #163538; }
 dialog input:focus, dialog select:focus { border-color: #4e867c; box-shadow: 0 0 0 3px rgb(78 134 124 / 18%); }
-.form-grid { display: grid; grid-template-columns: 1.2fr 1fr; gap: 11px; }
+.form-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 11px; }
 .dialog-actions { display: flex; justify-content: end; gap: 9px; margin-top: 2px; }
 .text-button { border: 0; padding: 9px 0; background: transparent; color: #2f7068; font-size: 12px; font-weight: 750; cursor: pointer; }
 .text-button:hover { color: #173f3d; text-decoration: underline; }
